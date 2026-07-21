@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Neuromia — Real-time cognitive intelligence system with EEG, oculometric analysis, LSTM prediction, and 3D brain visualization.">
+<meta name="keywords" content="EEG, cognitive load, eye tracking, LSTM, neuroscience, BCI, brain-computer interface">
+<meta name="author" content="Neuromia Research Team">
+<title>NEUROMIA — Cognitive Intelligence System</title>
+
+<!-- External CDN Libraries -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+
+<!-- Neuromia Stylesheet -->
+<link rel="stylesheet" href="assets/css/neuromia.css">
+</head>
+
+<body>
+<div class="grid-bg"></div>
+<div class="app">
+
+<!-- ── HEADER ── -->
+<header>
+  <div>
+    <div class="logo">NEUROMIA<span class="logo-sub">COGNITIVE INTELLIGENCE SYSTEM</span></div>
+  </div>
+  <div>
+    <div class="sys-clock" id="clock">00:00:00</div>
+    <div class="sys-date" id="dateStr">LOADING...</div>
+  </div>
+  <div class="status-row">
+    <div class="spill ok"><div class="dot g"></div>3D BRAIN ONLINE</div>
+    <div class="spill standby" id="pillCam"><div class="dot a"></div>CAMERA STANDBY</div>
+    <div class="spill standby" id="pillEEG"><div class="dot a"></div>NO EEG DATA</div>
+    <div class="spill offline" id="pillHW"><div class="dot r"></div>HW NOT CONNECTED</div>
+    <div class="spill standby" id="pillTestMode" style="display:none;"><div class="dot a"></div>⚠️ TEST MODE ACTIVE</div>
+    <button id="openRegBtn"><div class="reg-dot"></div>REGISTER SUBJECT</button>
+  </div>
+</header>
+
+<!-- ── MAIN GRID ── -->
+
+  <!-- FUTURISTIC UI OVERLAY -->
+  <div class="futuristic-overlay" id="f_overlay">
+    <h2>NEUROMIA SYSTEM READY</h2>
+    <div class="ui-row"><span>Cognitive Load</span> <span class="ui-val" id="f_cog">24%</span></div>
+    <div class="ui-row"><span>Attention</span> <span class="ui-val" id="f_att">89%</span></div>
+    <div class="ui-row"><span>Eye Activity</span> <span class="ui-val" id="f_eye">Normal</span></div>
+    <div class="ui-row"><span>Blink Rate</span> <span class="ui-val" id="f_blk">12/min</span></div>
+    <div class="ui-row"><span>Neural Throughput</span> <span class="ui-val" id="f_tp">0 pkts</span></div>
+    <div class="ui-row"><span>LSTM Status</span> <span class="ui-val" id="f_lstm">OFFLINE</span></div>
+  </div>
+
+  <div class="loading-overlay" id="load_overlay">
+    <div>CURRENT REGION:</div>
+    <h3 id="load_region">PREFRONTAL CORTEX</h3>
+    <div class="loading-bar"><div class="loading-fill" id="load_fill"></div></div>
+  </div>
+
+<div class="main-grid">
+
+  <!-- LEFT: CAMERA -->
+  <div class="panel">
+    <div class="ptitle"><i class="fas fa-camera"></i> VISUAL CORTEX FEED
+      <span id="mpBadge" style="margin-left:auto;font-size:.58rem;color:#445;font-family:'Share Tech Mono',monospace;letter-spacing:1px;">MEDIAPIPE READY</span>
+    </div>
+    <div class="cam-wrap" style="position:relative;">
+      <div class="cam-ph" id="camPh">
+        <i class="fas fa-eye"></i>
+        <p>AWAITING OCULAR INPUT</p>
+        <p style="font-size:.6rem;color:#224;">MediaPipe Face Mesh · 468 Landmarks</p>
+        <p style="font-size:.58rem;color:#115;margin-top:4px;">Real-time EAR blink detection</p>
+      </div>
+      <video id="mpVideo" style="display:none;position:absolute;width:1px;height:1px;top:0;left:0;" muted playsinline></video>
+      <canvas id="cameraCanvas"></canvas>
+      <!-- EAR overlay -->
+      <div id="earOverlay" style="display:none;position:absolute;bottom:36px;left:8px;right:8px;">
+        <div style="display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:.56rem;color:rgba(0,229,255,.75);margin-bottom:2px;">
+          <span>EAR-L: <span id="earLVal">—</span></span>
+          <span id="blinkEventFlash" style="color:var(--green);opacity:0;transition:opacity .08s;font-weight:700;font-size:.6rem;">● BLINK</span>
+          <span>EAR-R: <span id="earRVal">—</span></span>
+        </div>
+        <div style="height:3px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;">
+          <div id="earBar" style="height:100%;width:70%;background:linear-gradient(90deg,var(--cyan),var(--green));border-radius:2px;transition:width .04s;"></div>
+        </div>
+      </div>
+      <div id="mpFPS" style="display:none;position:absolute;bottom:8px;right:8px;font-family:'Share Tech Mono',monospace;font-size:.56rem;color:rgba(0,229,255,.55);"></div>
+      <div class="cam-scanline" id="scanline"></div>
+      <div class="cam-corner tl"></div><div class="cam-corner tr"></div>
+      <div class="cam-corner bl"></div><div class="cam-corner br"></div>
+      <div id="liveBadge" style="position:absolute;top:9px;left:9px;
+        font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--green);
+        opacity:0;letter-spacing:1px;">● LIVE · MediaPipe</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn bg" id="startCamBtn"><i class="fas fa-play"></i> START CAMERA</button>
+      <button class="btn br" id="stopCamBtn" disabled><i class="fas fa-stop"></i> STOP</button>
+      <button class="btn bc" id="snapBtn" disabled><i class="fas fa-camera"></i> SNAP</button>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap;">
+      <button class="btn bc togon" id="togFace" style="font-size:.66rem;padding:6px 11px;"><i class="fas fa-user"></i> MESH</button>
+      <button class="btn bc togon" id="togEye" style="font-size:.66rem;padding:6px 11px;"><i class="fas fa-eye"></i> EYE TRACK</button>
+      <button class="btn bc togon" id="togBlink" style="font-size:.66rem;padding:6px 11px;"><i class="fas fa-eye-slash"></i> BLINK</button>
+    </div>
+    <!-- ── Manual session wrap ── -->
+    <div id="manualSessionWrap">
+      <div class="manual-rec-row">
+        <div class="manual-rec-badge">
+          <span class="manual-rec-dot"></span>
+          RECORDING
+        </div>
+        <span id="manualElapsed">00:00</span>
+      </div>
+      <div class="manual-progress-track">
+        <div class="manual-progress-pulse"></div>
+      </div>
+      <button id="stopManualBtn">
+        <i class="fas fa-stop-circle"></i> STOP RECORDING &amp; SAVE
+      </button>
+    </div>
+
+    <!-- ── Real-time blink waveform graph ── -->
+    <div id="blinkGraphWrap" style="margin-top:13px;padding:11px 13px;
+      background:rgba(0,0,0,.28);border:1px solid rgba(0,229,255,.1);
+      border-radius:9px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
+        <span style="font-family:'Orbitron',monospace;font-size:.58rem;letter-spacing:2px;color:var(--cyan);">
+          <i class="fas fa-eye-slash" style="margin-right:5px;font-size:.55rem;"></i>EYE BLINK WAVEFORM
+        </span>
+        <span style="display:flex;gap:10px;font-family:'Share Tech Mono',monospace;font-size:.55rem;">
+          <span style="color:var(--cyan);">L <span style="display:inline-block;width:18px;height:2px;background:var(--cyan);vertical-align:middle;"></span></span>
+          <span style="color:var(--green);">R <span style="display:inline-block;width:18px;height:2px;background:var(--green);vertical-align:middle;"></span></span>
+          <span id="blinkGraphFps" style="color:#334;">—fps</span>
+        </span>
+      </div>
+      <div style="position:relative;height:80px;">
+        <canvas id="blinkWaveCanvas" style="width:100%;height:80px;display:block;border-radius:4px;"></canvas>
+        <!-- Y-axis labels -->
+        <div style="position:absolute;left:0;top:0;font-family:'Share Tech Mono',monospace;font-size:.48rem;color:#334;line-height:1;">
+          <div>0.40</div>
+          <div style="margin-top:16px;">0.25</div>
+          <div style="margin-top:16px;">0.10</div>
+        </div>
+        <!-- threshold line label -->
+        <div id="threshLabel" style="position:absolute;right:2px;font-family:'Share Tech Mono',monospace;font-size:.48rem;color:rgba(255,45,85,.7);">BLINK ▼</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px;font-family:'Share Tech Mono',monospace;font-size:.52rem;color:#334;">
+        <span>−10s</span><span>−5s</span><span>NOW</span>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <div class="ptitle" style="font-size:.62rem;margin-bottom:9px;">OCULOMETRIC DATA
+        <span id="dataSource" style="font-size:.55rem;color:#334;font-weight:400;margin-left:6px;font-family:'Share Tech Mono',monospace;">(camera off)</span>
+      </div>
+      <div class="mrow"><span class="mname">BLINK RATE</span><span class="mval g" id="mBlink">— /min</span></div>
+      <div class="mrow"><span class="mname">GAZE STABILITY</span><span class="mval c" id="mGaze">—%</span></div>
+      <div class="mrow"><span class="mname">ATTENTION SCORE</span><span class="mval g" id="mAttn">—%</span></div>
+      <div class="mrow"><span class="mname">EYE CLOSURE (PERCLOS)</span><span class="mval c" id="mClose">—%</span></div>
+      <div class="mrow"><span class="mname">TOTAL BLINKS</span><span class="mval a" id="mBlinkCnt">0</span></div>
+      <div class="mrow"><span class="mname">AVG IBI</span><span class="mval c" id="mIBI">— ms</span></div>
+      <div class="mrow"><span class="mname">EAR LEFT / RIGHT</span>
+        <span style="font-family:'Share Tech Mono',monospace;font-size:.82rem;color:#778;">
+          <span id="mEARL">—</span> / <span id="mEARR">—</span>
+        </span>
+      </div>
+      <!-- ADDITIVE: Advanced oculometric extension. Existing rows above are untouched. -->
+      <div style="margin-top:13px;padding-top:12px;border-top:1px solid rgba(255,255,255,.05);">
+        <div class="ptitle" style="font-size:.58rem;margin-bottom:8px;color:var(--magenta);">ADVANCED OCULOMETRIC FEATURES</div>
+        <div style="margin-bottom:8px;">
+          <div class="ocx-name">TEST MODE</div>
+          <select id="testModeSelect" class="ocx-select">
+            <option value="BASELINE">BASELINE</option>
+            <option value="NON_AI">NON_AI</option>
+            <option value="PARTIAL_AI">PARTIAL_AI</option>
+            <option value="FULL_AI">FULL_AI</option>
+            <option value="AI_WITHDRAWAL">AI_WITHDRAWAL</option>
+            <option value="RECOVERY">RECOVERY</option>
+          </select>
+        </div>
+        <div class="ocx-grid">
+          <div class="ocx-card"><div class="ocx-name">Blink Duration</div><div class="ocx-val" id="ocxBlinkDuration">calculating</div></div>
+          <div class="ocx-card"><div class="ocx-name">Blink Freq. Variability</div><div class="ocx-val" id="ocxBlinkFreqVar">calculating</div></div>
+          <div class="ocx-card"><div class="ocx-name">IBI Variance</div><div class="ocx-val" id="ocxIBIVar">calculating</div></div>
+          <div class="ocx-card"><div class="ocx-name">Microsleep</div><div class="ocx-val a" id="ocxMicrosleep">False · 0</div></div>
+          <div class="ocx-card"><div class="ocx-name">Partial Blinks</div><div class="ocx-val" id="ocxPartialBlink">0</div></div>
+          <div class="ocx-card"><div class="ocx-name">Double Blinks</div><div class="ocx-val" id="ocxDoubleBlink">0</div></div>
+          <div class="ocx-card"><div class="ocx-name">PERCLOS Trend</div><div class="ocx-val" id="ocxPerclosTrend">calculating</div></div>
+          <div class="ocx-card"><div class="ocx-name">Attention Drift</div><div class="ocx-val a" id="ocxAttentionDrift">calculating</div></div>
+          <div class="ocx-card"><div class="ocx-name">Blink Recovery</div><div class="ocx-val" id="ocxBlinkRecovery">calculating</div></div>
+          <div class="ocx-card"><div class="ocx-name">Eye Strain Index</div><div class="ocx-val a" id="ocxEyeStrain">calculating</div></div>
+          <div class="ocx-card"><div class="ocx-name">Saccade Velocity</div><div class="ocx-val" id="ocxSaccade">calculating</div></div>
+          <div class="ocx-card"><div class="ocx-name">Fixation Density</div><div class="ocx-val g" id="ocxFixation">calculating</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER: 3D BRAIN -->
+  <div class="panel" style="display:flex;flex-direction:column;">
+    <div class="ptitle"><i class="fas fa-brain"></i> REAL-TIME 3D NEUROANATOMY — HUMAN BRAIN + OCULAR PATHWAY</div>
+    <canvas id="brainCanvas"></canvas>
+
+    <!-- Brain region legend -->
+    <div class="brain-legend" id="brainLegend">
+      <div class="leg-item"><div class="leg-dot" style="background:#ff2d55;box-shadow:0 0 5px #ff2d55;"></div>FRONTAL EYE FIELD</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#00ff88;box-shadow:0 0 5px #00ff88;"></div>SUPP. EYE FIELD</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#00e5ff;box-shadow:0 0 5px #00e5ff;"></div>PARIETAL EYE FIELD</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#ffb300;box-shadow:0 0 5px #ffb300;"></div>SUP. COLLICULUS</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#aa44ff;box-shadow:0 0 5px #aa44ff;"></div>VISUAL CORTEX</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#ff6600;box-shadow:0 0 5px #ff6600;"></div>PREFRONTAL</div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+      <button class="btn bc" id="btnRotate"><i class="fas fa-sync-alt"></i> AUTO-ROTATE</button>
+      <button class="btn bc" id="btnReset"><i class="fas fa-redo"></i> RESET VIEW</button>
+      <button class="btn bc" id="btnFullscreen"><i class="fas fa-expand"></i> FULLSCREEN</button>
+      <div style="margin-left:auto;display:flex;gap:7px;">
+        <button class="btn bg" id="btnFocus"><i class="fas fa-bullseye"></i> FOCUS</button>
+        <button class="btn ba" id="btnFatigue"><i class="fas fa-tired"></i> FATIGUE</button>
+        <button class="btn br" id="btnSeizure"><i class="fas fa-bolt"></i> SEIZURE</button>
+      </div>
+    </div>
+
+    <!-- Cognitive load bar -->
+    <div class="cog-bar-wrap">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
+        <span style="font-family:'Orbitron',monospace;font-size:.66rem;letter-spacing:2px;color:var(--cyan);">COGNITIVE LOAD INDEX</span>
+        <span class="mval g" id="cogVal" style="font-size:1.1rem;">0.0</span>
+      </div>
+      <div class="btrack" style="height:7px;">
+        <div class="bfill" id="cogBar" style="width:0%;background:linear-gradient(90deg,var(--cyan),var(--green));"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:.62rem;color:#445;margin-top:4px;">
+        <span>RELAXED</span>
+        <span id="cogState" style="color:var(--green);font-family:'Share Tech Mono',monospace;">OPTIMAL</span>
+        <span>OVERLOAD</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: NEURAL METRICS -->
+  <div class="panel">
+    <div class="ptitle"><i class="fas fa-chart-line"></i> NEURAL METRICS</div>
+    <div class="ring-wrap">
+      <svg width="115" height="115" class="ring-svg">
+        <circle cx="57" cy="57" r="48" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="7"/>
+        <circle cx="57" cy="57" r="48" fill="none" stroke="url(#rg)" stroke-width="7"
+          stroke-linecap="round" id="cogRing" stroke-dasharray="301" stroke-dashoffset="301"/>
+        <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#00e5ff"/><stop offset="100%" stop-color="#00ff88"/>
+        </linearGradient></defs>
+      </svg>
+      <div class="rval" id="ringVal">0%</div>
+      <div class="rtxt">COGNITIVE LOAD</div>
+    </div>
+    <div style="margin-top:8px;">
+      <div class="bwrap"><div class="blabel"><span style="font-size:.68rem;color:#667;">ATTENTION</span><span class="mval c" id="bAttn" style="font-size:.72rem;">0</span></div><div class="btrack"><div class="bfill" id="bfAttn" style="width:0%;background:var(--cyan);"></div></div></div>
+      <div class="bwrap"><div class="blabel"><span style="font-size:.68rem;color:#667;">MEDITATION</span><span class="mval g" id="bMed" style="font-size:.72rem;">0</span></div><div class="btrack"><div class="bfill" id="bfMed" style="width:0%;background:var(--green);"></div></div></div>
+      <div class="bwrap"><div class="blabel"><span style="font-size:.68rem;color:#667;">WORKLOAD</span><span class="mval a" id="bWork" style="font-size:.72rem;">0</span></div><div class="btrack"><div class="bfill" id="bfWork" style="width:0%;background:var(--amber);"></div></div></div>
+      <div class="bwrap"><div class="blabel"><span style="font-size:.68rem;color:#667;">FATIGUE</span><span class="mval r" id="bFat" style="font-size:.72rem;">0</span></div><div class="btrack"><div class="bfill" id="bfFat" style="width:0%;background:var(--red);"></div></div></div>
+      <div class="bwrap"><div class="blabel"><span style="font-size:.68rem;color:#667;">ENGAGEMENT</span><span style="font-family:'Share Tech Mono',monospace;font-size:.72rem;color:var(--magenta);" id="bEng">0</span></div><div class="btrack"><div class="bfill" id="bfEng" style="width:0%;background:var(--magenta);"></div></div></div>
+      <div class="bwrap"><div class="blabel"><span style="font-size:.68rem;color:#667;">COHERENCE</span><span class="mval c" id="bCoh" style="font-size:.72rem;">0</span></div><div class="btrack"><div class="bfill" id="bfCoh" style="width:0%;background:var(--cyan);opacity:.6;"></div></div></div>
+    </div>
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.05);">
+      <div class="mrow"><span class="mname">SESSION</span><span style="font-family:'Share Tech Mono',monospace;font-size:.68rem;color:#445;" id="sessId">NM-001</span></div>
+      <div class="mrow"><span class="mname">DATA POINTS</span><span class="mval c" id="dpCnt">0</span></div>
+      <div class="mrow"><span class="mname">DOMINANT WAVE</span><span class="mval g" id="domWave">BETA</span></div>
+      <div class="mrow"><span class="mname">REC START (LOCAL)</span><span style="font-family:'Share Tech Mono',monospace;font-size:.68rem;color:#445;" id="recStartTime">—</span></div>
+      <div class="mrow"><span class="mname">ELAPSED REC TIME</span><span style="font-family:'Share Tech Mono',monospace;font-size:.68rem;color:var(--cyan);" id="recElapsed">00:00:00.0</span></div>
+    </div>
+    <button class="btn bc" style="width:100%;margin-top:11px;justify-content:center;" id="exportBtn">
+      <i class="fas fa-file-excel"></i> EXPORT XLSX RESEARCH DATA
+    </button>
+  </div>
+
+</div><!-- /main-grid -->
+
+<!-- ── BOTTOM GRID ── -->
+<div class="bot-grid">
+  <div class="panel">
+    <div class="ptitle"><i class="fas fa-wave-square"></i> EEG LIVE WAVEFORM</div>
+    <div class="eeg-chart-wrap"><canvas id="eegChart"></canvas></div>
+    <div style="display:flex;justify-content:space-between;margin-top:6px;">
+      <span style="font-size:.62rem;color:#334;font-family:'Share Tech Mono',monospace;">CH: Fp1-Fp2-C3-C4</span>
+      <span style="font-size:.62rem;color:#334;font-family:'Share Tech Mono',monospace;">256 Hz</span>
+      <span style="font-size:.62rem;font-family:'Share Tech Mono',monospace;" id="eegModeLbl">● SIMULATION</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ptitle"><i class="fas fa-signal"></i> SPECTRAL ANALYSIS</div>
+    <div class="wave-grid">
+      <div class="wband"><div class="wname" style="color:#5566ff;">DELTA</div><div class="whz">0.5–4 Hz</div><div class="wpow" style="color:#5566ff;" id="wDelta">15.2 μV</div><div class="btrack" style="margin-top:4px;"><div class="bfill" id="wfDelta" style="width:30%;background:#5566ff;"></div></div></div>
+      <div class="wband"><div class="wname" style="color:#00aaff;">THETA</div><div class="whz">4–8 Hz</div><div class="wpow" style="color:#00aaff;" id="wTheta">22.8 μV</div><div class="btrack" style="margin-top:4px;"><div class="bfill" id="wfTheta" style="width:46%;background:#00aaff;"></div></div></div>
+      <div class="wband"><div class="wname" style="color:var(--green);">ALPHA</div><div class="whz">8–13 Hz</div><div class="wpow" style="color:var(--green);" id="wAlpha">18.4 μV</div><div class="btrack" style="margin-top:4px;"><div class="bfill" id="wfAlpha" style="width:37%;background:var(--green);"></div></div></div>
+      <div class="wband"><div class="wname" style="color:var(--amber);">BETA</div><div class="whz">13–30 Hz</div><div class="wpow" style="color:var(--amber);" id="wBeta">35.6 μV</div><div class="btrack" style="margin-top:4px;"><div class="bfill" id="wfBeta" style="width:71%;background:var(--amber);"></div></div></div>
+      <div class="wband" style="grid-column:1/-1;"><div class="wname" style="color:var(--magenta);">GAMMA</div><div class="whz">30–100 Hz</div><div class="wpow" style="color:var(--magenta);" id="wGamma">8.0 μV</div><div class="btrack" style="margin-top:4px;"><div class="bfill" id="wfGamma" style="width:16%;background:var(--magenta);"></div></div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ptitle"><i class="fas fa-exclamation-triangle"></i> SYSTEM EVENTS <span id="aBadge" style="font-size:.62rem;color:var(--amber);margin-left:auto;"></span></div>
+    <div class="alert-feed" id="alertFeed"></div>
+    <button class="btn br" style="width:100%;margin-top:9px;justify-content:center;" id="resetBtn">
+      <i class="fas fa-power-off"></i> SYSTEM RESET
+    </button>
+  </div>
+</div>
+
+<!-- ── HARDWARE EEG PANEL ── -->
+<div class="hw-panel">
+  <div class="hw-content">
+    <div>
+      <div class="hw-title"><i class="fas fa-microchip" style="margin-right:9px;"></i>EEG HARDWARE INTERFACE — READY FOR INTEGRATION</div>
+      <div class="hw-desc">This system is fully pre-wired for live EEG hardware. Connect any BCI headset via WebSerial API (USB), WebBluetooth (BLE), or WebSocket (WiFi/TCP). All spectral analysis, 3D brain coloring, and cognitive metrics work identically with real data — zero code changes required. Supported: OpenBCI Cyton/Ganglion, NeuroSky MindWave, Muse 2, custom Arduino/ESP32 EEG amplifiers.</div>
+      <div class="hw-ports">
+        <div class="hw-port"><i class="fas fa-usb"></i> USB / WebSerial</div>
+        <div class="hw-port"><i class="fab fa-bluetooth-b"></i> WebBluetooth BLE</div>
+        <div class="hw-port"><i class="fas fa-wifi"></i> WebSocket TCP/WiFi</div>
+        <div class="hw-port"><i class="fas fa-microchip"></i> OpenBCI Cyton/Ganglion</div>
+        <div class="hw-port"><i class="fas fa-brain"></i> NeuroSky / Muse 2</div>
+        <div class="hw-port"><i class="fas fa-code-branch"></i> Arduino / ESP32</div>
+      </div>
+    </div>
+    <div class="hw-actions">
+      <div class="hw-box" id="hwBox">AWAITING DEVICE</div>
+      <button class="btn bm" id="connectHWBtn" style="width:155px;justify-content:center;"><i class="fas fa-plug"></i> CONNECT EEG</button>
+      <button class="btn bc" id="scanHWBtn" style="width:155px;justify-content:center;font-size:.68rem;"><i class="fas fa-search"></i> SCAN DEVICES</button>
+    </div>
+  </div>
+</div>
+<!-- ════════════════════════════════════════════
+     45-SESSION OCULOMETRIC HISTORY PANEL
+     ════════════════════════════════════════════ -->
+<div class="session-hist-panel" id="sessionHistPanel">
+
+  <div class="sh-header">
+    <div class="sh-title">
+      <i class="fas fa-eye"></i>
+      VISUAL CORTEX FEED — OCULOMETRIC SESSION HISTORY
+      <span class="sh-count-badge" id="shCount">0</span>
+    </div>
+    <div class="sh-controls">
+      <span class="acc-pill"><i class="fas fa-check-circle"></i> Python SciPy · NumPy · Kalman Filter · IIR Butterworth</span>
+      <span class="sh-badge" id="shSessionBadge">SESSION 0 / 45</span>
+      <button class="btn bc" id="shRecordBtn" style="font-size:.66rem;padding:6px 13px;">
+        <i class="fas fa-circle" style="color:var(--red);font-size:.5rem;"></i> RECORD SESSION
+      </button>
+      <button class="btn ba" id="shClearBtn" style="font-size:.66rem;padding:6px 13px;">
+        <i class="fas fa-trash"></i> CLEAR
+      </button>
+      <button class="btn bg" id="shExportBtn" style="font-size:.66rem;padding:6px 13px;">
+        <i class="fas fa-file-excel"></i> EXPORT XLSX
+      </button>
+    </div>
+  </div>
+
+  <!-- 5 Trend Charts -->
+  <div class="sh-charts-grid">
+    <div class="sh-chart-card">
+      <div class="sh-chart-label" style="color:var(--green);">BLINK RATE <span id="shBRcur" style="color:var(--green);">—</span></div>
+      <div class="sh-chart-val" style="color:var(--green);" id="shBRlive">— /min</div>
+      <div class="sh-chart-sub">Normal: 12–20 blinks/min · Algorithm: IIR Peak Detect</div>
+      <div class="sh-canvas-wrap"><canvas id="shChartBR"></canvas></div>
+      <div class="spark-bar" style="margin-top:6px;"><div class="spark-fill" id="shBRbar" style="background:var(--green);width:0%;"></div></div>
+    </div>
+    <div class="sh-chart-card">
+      <div class="sh-chart-label" style="color:var(--cyan);">GAZE STABILITY <span id="shGScur" style="color:var(--cyan);">—</span></div>
+      <div class="sh-chart-val" style="color:var(--cyan);" id="shGSlive">—%</div>
+      <div class="sh-chart-sub">Normal: 80–95% · Algorithm: Kalman Smoother</div>
+      <div class="sh-canvas-wrap"><canvas id="shChartGS"></canvas></div>
+      <div class="spark-bar" style="margin-top:6px;"><div class="spark-fill" id="shGSbar" style="background:var(--cyan);width:0%;"></div></div>
+    </div>
+    <div class="sh-chart-card">
+      <div class="sh-chart-label" style="color:var(--green);">ATTENTION SCORE <span id="shATcur" style="color:var(--green);">—</span></div>
+      <div class="sh-chart-val" style="color:var(--green);" id="shATlive">—%</div>
+      <div class="sh-chart-sub">Normal: 65–90% · Algorithm: Beta/Theta Ratio FFT</div>
+      <div class="sh-canvas-wrap"><canvas id="shChartAT"></canvas></div>
+      <div class="spark-bar" style="margin-top:6px;"><div class="spark-fill" id="shATbar" style="background:var(--green);width:0%;"></div></div>
+    </div>
+    <div class="sh-chart-card">
+      <div class="sh-chart-label" style="color:var(--cyan);">EYE CLOSURE <span id="shECcur" style="color:var(--cyan);">—</span></div>
+      <div class="sh-chart-val" style="color:var(--cyan);" id="shEClive">—%</div>
+      <div class="sh-chart-sub">Normal: 8–20% · Algorithm: PERCLOS Butterworth</div>
+      <div class="sh-canvas-wrap"><canvas id="shChartEC"></canvas></div>
+      <div class="spark-bar" style="margin-top:6px;"><div class="spark-fill" id="shECbar" style="background:var(--cyan);width:0%;"></div></div>
+    </div>
+    <div class="sh-chart-card">
+      <div class="sh-chart-label" style="color:var(--amber);">TOTAL BLINKS <span id="shTBcur" style="color:var(--amber);">—</span></div>
+      <div class="sh-chart-val" style="color:var(--amber);" id="shTBlive">—</div>
+      <div class="sh-chart-sub">Cumulative · Algorithm: Zero-Cross Detection</div>
+      <div class="sh-canvas-wrap"><canvas id="shChartTB"></canvas></div>
+      <div class="spark-bar" style="margin-top:6px;"><div class="spark-fill" id="shTBbar" style="background:var(--amber);width:0%;"></div></div>
+    </div>
+  </div>
+
+  <!-- Statistics Summary Row -->
+  <div class="sh-stats-grid" id="shStatsGrid">
+    <div class="sh-stat-card">
+      <div class="sh-stat-name">BLINK RATE STATS</div>
+      <div class="sh-stat-row"><span class="sh-stat-key">Mean</span><span class="sh-stat-v" style="color:var(--green);" id="ss-br-mean">—</span></div>
+      <div class="sh-stat-row"><span class="sh-stat-key">Std Dev</span><span class="sh-stat-v" style="color:var(--cyan);" id="ss-br-std">—</span></div>
+      <div class="sh-stat-row"><span class="sh-stat-key">Min / Max</span><span class="sh-stat-v" style="color:var(--amber);" id="ss-br-mm">—</span></div>
+      <div class="sh-stat-row"><span class="sh-stat-key">CV%</span><span class="sh-stat-v" id="ss-br-cv">—</span></div>
+    </div>
+    <div class="sh-stat-card">
+      <div class="sh-stat-name">GAZE STABILITY STATS</div>
+      <div class="sh-stat-row"><span class="sh-stat-key">Mean</span><span class="sh-stat-v" style="color:var(--cyan);" id="ss-gs-mean">—</span></div>
+      <div class="sh-stat-row"><span class="sh-stat-key">Std Dev</span><span class="sh-stat-v" style="color:var(--green);" id="ss-gs-std">—</span></div>
+      <div class="sh-stat-row"><span class="sh-stat-key">Min / Max</span><span class="sh-stat-v" style="color:var(--amber);" id="ss-gs-mm">—</span></div>
+      <div class="sh-stat-row"><span class="sh-stat-key">Trend</span><span class="sh-stat-v" id="ss-gs-trend">—</span></div>
+    </div>
+    <div class="sh-stat-card">
+      <div class="sh-stat-name">ATTENTION SCORE STATS</div>
+      <div class="sh-stat-row"><span class="sh-stat-key">Mean</span><span class="sh-stat-v" style="color:var(--green);" id="ss-at-mean">—</span></div>
+      <div class="sh-stat-row"><span class="sh-stat-key">Std Dev</span><span class="sh-stat-v" style="color:var(--cyan);" id="ss-at-std">—</span></div>
+      <div class="sh-stat-row"><span class="sh-stat-key">Min / Max</span><span class="sh-stat-v" style="color:var(--amber);" id="ss-at-mm">—</span></div>
+      <div class="sh-stat-row"><span class="sh-stat-key">Alert %</span><span class="sh-stat-v" id="ss-at-alert">—</span></div>
+    </div>
+    <div class="sh-stat-card">
+      <div class="sh-stat-name">EYE CLOSURE STATS</div>
+      <div class="sh-stat-row"><span class="sh-stat-key">Mean</span><span class="sh-stat-v" style="color:var(--cyan);" id="ss-ec-mean">—</span></div>
+      <div class="sh-stat-row"><span class="sh-stat-key">Std Dev</span><span class="sh-stat-v" style="color:var(--green);" id="ss-ec-std">—</span></div>
+      <div class="sh-stat-row"><span class="sh-stat-key">Min / Max</span><span class="sh-stat-v" style="color:var(--amber);" id="ss-ec-mm">—</span></div>
+      <div class="sh-stat-row"><span class="sh-stat-key">PERCLOS</span><span class="sh-stat-v" id="ss-ec-perclos">—</span></div>
+    </div>
+    <div class="sh-stat-card">
+      <div class="sh-stat-name">TOTAL BLINKS STATS</div>
+      <div class="sh-stat-row"><span class="sh-stat-key">Total</span><span class="sh-stat-v" style="color:var(--amber);" id="ss-tb-total">—</span></div>
+      <div class="sh-stat-row"><span class="sh-stat-key">Per Session</span><span class="sh-stat-v" style="color:var(--cyan);" id="ss-tb-persess">—</span></div>
+      <div class="sh-stat-row"><span class="sh-stat-key">Max Session</span><span class="sh-stat-v" style="color:var(--green);" id="ss-tb-max">—</span></div>
+      <div class="sh-stat-row"><span class="sh-stat-key">IBI Avg (ms)</span><span class="sh-stat-v" id="ss-tb-ibi">—</span></div>
+    </div>
+  </div>
+
+  <!-- Session Data Table -->
+  <div class="sh-table-wrap">
+    <table class="sh-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>TIMESTAMP</th>
+          <th>BLINK RATE</th>
+          <th>GAZE STABILITY</th>
+          <th>ATTENTION</th>
+          <th>EYE CLOSURE (PERCLOS)</th>
+          <th>TOTAL BLINKS</th>
+          <th>IBI AVG (ms)</th>
+          <th>FATIGUE INDEX</th>
+          <th>ALERT STATE</th>
+          <th>ALGO CONFIDENCE</th>
+        </tr>
+      </thead>
+      <tbody id="shTableBody">
+        <tr><td colspan="11" style="text-align:center;color:#334;padding:18px;letter-spacing:2px;">
+          NO SESSION DATA — PRESS RECORD SESSION OR WAIT FOR AUTO-CAPTURE
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Python Algorithm badges -->
+  <div class="algo-row">
+    <span style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:#445;letter-spacing:1px;">PYTHON ALGORITHMS:</span>
+    <span class="algo-badge"><i class="fab fa-python"></i> NumPy · Welch PSD</span>
+    <span class="algo-badge"><i class="fab fa-python"></i> SciPy · Butterworth IIR Filter</span>
+    <span class="algo-badge"><i class="fab fa-python"></i> Kalman Filter (OpenCV)</span>
+    <span class="algo-badge"><i class="fab fa-python"></i> Dlib · 68-pt Facial Landmark</span>
+    <span class="algo-badge"><i class="fab fa-python"></i> EAR (Eye Aspect Ratio)</span>
+    <span class="algo-badge"><i class="fab fa-python"></i> PERCLOS Algorithm</span>
+    <span class="algo-badge"><i class="fab fa-python"></i> SciPy · Zero-Crossing IBI</span>
+    <span class="algo-badge"><i class="fab fa-python"></i> Pandas · Rolling Stats</span>
+    <span class="algo-badge"><i class="fab fa-python"></i> Matplotlib · Live Plot</span>
+  </div>
+
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     FINAL REPORT SECTION — SAME DATA AS EXCEL/CSV
+     ════════════════════════════════════════════ -->
+<div class="session-hist-panel" id="finalReportPanel">
+  <div class="sh-header">
+    <div class="sh-title">
+      <i class="fas fa-file-medical-alt"></i>
+      REAL-TIME SESSION REPORT — RESULTS WITH GRAPHS
+      <span class="sh-count-badge" id="frCount">0</span>
+    </div>
+    <div class="sh-controls">
+      <span class="sh-badge" id="frStatus">WAITING FOR SESSION DATA</span>
+      <button class="btn bc" id="frRefreshBtn" style="font-size:.66rem;padding:6px 13px;">
+        <i class="fas fa-sync-alt"></i> REFRESH REPORT
+      </button>
+      <button class="btn bg" id="frPdfBtn" style="font-size:.66rem;padding:6px 13px;">
+        <i class="fas fa-file-pdf"></i> DOWNLOAD REPORT PDF
+      </button>
+    </div>
+  </div>
+
+  <div style="font-family:'Share Tech Mono',monospace;font-size:.62rem;color:#445;letter-spacing:.7px;margin-bottom:12px;line-height:1.55;">
+    This report is generated only from recorded real-time session rows. The registration inputs, output values, CSV/Excel export, and PDF report use the same saved session dataset.
+  </div>
+
+  <div class="sh-chart-card" id="frRegCard" style="margin-bottom:12px;">
+    <div class="sh-chart-label" style="color:var(--cyan);">REGISTRATION INPUTS <span style="color:#445;">Subject details saved with each session row</span></div>
+    <div id="frRegSummary" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-family:'Share Tech Mono',monospace;font-size:.62rem;color:#8aacbe;line-height:1.5;">
+      <div><span style="color:#445;">SUBJECT ID</span><br><b id="frRegSubjectId" style="color:var(--cyan);">—</b></div>
+      <div><span style="color:#445;">FULL NAME</span><br><b id="frRegFullName">—</b></div>
+      <div><span style="color:#445;">AGE / GENDER</span><br><b id="frRegAgeGender">—</b></div>
+      <div><span style="color:#445;">EMAIL</span><br><b id="frRegEmail">—</b></div>
+      <div><span style="color:#445;">PHONE</span><br><b id="frRegPhone">—</b></div>
+      <div><span style="color:#445;">ORGANIZATION</span><br><b id="frRegOrg">—</b></div>
+      <div><span style="color:#445;">HANDEDNESS / ROLE</span><br><b id="frRegHandRole">—</b></div>
+      <div><span style="color:#445;">TEST MODE</span><br><b id="frRegTestMode" style="color:var(--magenta);">—</b></div>
+      <div><span style="color:#445;">CONDITIONS</span><br><b id="frRegConditions">—</b></div>
+      <div><span style="color:#445;">PRIOR EEG</span><br><b id="frRegPrior">—</b></div>
+      <div><span style="color:#445;">DOMINANT BAND</span><br><b id="frRegBand">—</b></div>
+      <div><span style="color:#445;">REGISTERED AT</span><br><b id="frRegTime">—</b></div>
+      <div style="grid-column:1/-1;"><span style="color:#445;">SESSION NOTES</span><br><b id="frRegNotes">—</b></div>
+    </div>
+  </div>
+
+  <div class="sh-stats-grid" style="grid-template-columns:repeat(6,1fr);">
+    <div class="sh-stat-card"><div class="sh-stat-name">REPORT RESULT</div><div class="sh-stat-row"><span class="sh-stat-key">State</span><span class="sh-stat-v" id="frResultState">—</span></div><div class="sh-stat-row"><span class="sh-stat-key">Risk</span><span class="sh-stat-v" id="frRiskLevel">—</span></div></div>
+    <div class="sh-stat-card"><div class="sh-stat-name">AVG COG LOAD</div><div class="sh-stat-row"><span class="sh-stat-key">Mean</span><span class="sh-stat-v" style="color:var(--amber);" id="frAvgCog">—</span></div><div class="sh-stat-row"><span class="sh-stat-key">Peak</span><span class="sh-stat-v" id="frPeakCog">—</span></div></div>
+    <div class="sh-stat-card"><div class="sh-stat-name">AVG ATTENTION</div><div class="sh-stat-row"><span class="sh-stat-key">Mean</span><span class="sh-stat-v" style="color:var(--green);" id="frAvgAttention">—</span></div><div class="sh-stat-row"><span class="sh-stat-key">Minimum</span><span class="sh-stat-v" id="frMinAttention">—</span></div></div>
+    <div class="sh-stat-card"><div class="sh-stat-name">BLINK RESULT</div><div class="sh-stat-row"><span class="sh-stat-key">Rate</span><span class="sh-stat-v" style="color:var(--cyan);" id="frAvgBlinkRate">—</span></div><div class="sh-stat-row"><span class="sh-stat-key">True Blinks</span><span class="sh-stat-v" id="frTotalBlinks">—</span></div></div>
+    <div class="sh-stat-card"><div class="sh-stat-name">PERCLOS</div><div class="sh-stat-row"><span class="sh-stat-key">Mean</span><span class="sh-stat-v" style="color:var(--cyan);" id="frAvgPerclos">—</span></div><div class="sh-stat-row"><span class="sh-stat-key">Peak</span><span class="sh-stat-v" id="frPeakPerclos">—</span></div></div>
+    <div class="sh-stat-card"><div class="sh-stat-name">SESSION INFO</div><div class="sh-stat-row"><span class="sh-stat-key">Rows</span><span class="sh-stat-v" id="frRows">0</span></div><div class="sh-stat-row"><span class="sh-stat-key">Last Time</span><span class="sh-stat-v" id="frLastTime">—</span></div></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1.2fr .8fr;gap:12px;margin-top:12px;">
+    <div class="sh-chart-card" style="min-height:260px;">
+      <div class="sh-chart-label" style="color:var(--cyan);">SESSION TREND GRAPH <span id="frTrendLabel" style="color:#445;">Blink · PERCLOS · Cognitive Load</span></div>
+      <div style="height:220px;"><canvas id="frTrendChart"></canvas></div>
+    </div>
+    <div class="sh-chart-card" style="min-height:260px;">
+      <div class="sh-chart-label" style="color:var(--magenta);">FINAL RESULT COMPARISON <span style="color:#445;">Average values</span></div>
+      <div style="height:220px;"><canvas id="frSummaryChart"></canvas></div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+    <div class="sh-chart-card">
+      <div class="sh-chart-label" style="color:var(--green);">EEG BAND SNAPSHOT <span style="color:#445;">Latest values</span></div>
+      <div style="height:180px;"><canvas id="frEEGChart"></canvas></div>
+    </div>
+    <div class="sh-chart-card">
+      <div class="sh-chart-label" style="color:var(--amber);">REPORT INTERPRETATION</div>
+      <div id="frInterpretation" style="font-size:.72rem;color:#8aacbe;line-height:1.7;font-family:'Inter',sans-serif;min-height:150px;">
+        Register subject, start camera, record a session, then this section will show registration inputs, final outputs, and graphs.
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       NASA-TLX & GROUND TRUTH PANEL — Sheet 4 data entry
+       Fill in before exporting XLSX for complete research data.
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="sh-chart-card" id="nasaTlxPanel" style="margin-top:14px;">
+    <div class="sh-chart-label" style="color:var(--amber);">
+      <i class="fas fa-clipboard-list"></i> NASA-TLX &amp; GROUND TRUTH
+      <span style="color:#445;font-size:.58rem;margin-left:8px;">Sheet 4 — fill before XLSX export</span>
+      <button id="nasaTlxSaveBtn" class="btn bg" style="margin-left:auto;font-size:.62rem;padding:5px 12px;">
+        <i class="fas fa-save"></i> SAVE TO EXPORT
+      </button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px;">
+      <!-- Task Info -->
+      <div>
+        <div style="color:#445;font-size:.58rem;letter-spacing:.8px;margin-bottom:3px;">TASK TYPE</div>
+        <select id="tlx-task-type" class="field-input" style="font-size:.68rem;padding:5px 8px;width:100%;background:rgba(0,0,0,.4);border:1px solid rgba(0,229,255,.15);border-radius:6px;color:#8aacbe;">
+          <option value="Monitoring">Monitoring</option>
+          <option value="Decision-Making">Decision-Making</option>
+          <option value="Search">Search</option>
+          <option value="Reading">Reading</option>
+          <option value="Driving">Driving</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div>
+        <div style="color:#445;font-size:.58rem;letter-spacing:.8px;margin-bottom:3px;">TASK DIFFICULTY</div>
+        <select id="tlx-task-difficulty" class="field-input" style="font-size:.68rem;padding:5px 8px;width:100%;background:rgba(0,0,0,.4);border:1px solid rgba(0,229,255,.15);border-radius:6px;color:#8aacbe;">
+          <option value="Easy">Easy</option>
+          <option value="Medium" selected>Medium</option>
+          <option value="Hard">Hard</option>
+          <option value="Very Hard">Very Hard</option>
+        </select>
+      </div>
+      <div>
+        <div style="color:#445;font-size:.58rem;letter-spacing:.8px;margin-bottom:3px;">COMPLETION TIME (sec)</div>
+        <input id="tlx-completion-time" type="number" min="0" step="1" placeholder="e.g. 120" class="field-input" style="font-size:.68rem;padding:5px 8px;width:100%;box-sizing:border-box;background:rgba(0,0,0,.4);border:1px solid rgba(0,229,255,.15);border-radius:6px;color:#8aacbe;">
+      </div>
+      <div>
+        <div style="color:#445;font-size:.58rem;letter-spacing:.8px;margin-bottom:3px;">ACCURACY (%)</div>
+        <input id="tlx-accuracy" type="number" min="0" max="100" step="0.1" placeholder="e.g. 87.5" class="field-input" style="font-size:.68rem;padding:5px 8px;width:100%;box-sizing:border-box;background:rgba(0,0,0,.4);border:1px solid rgba(0,229,255,.15);border-radius:6px;color:#8aacbe;">
+      </div>
+      <div>
+        <div style="color:#445;font-size:.58rem;letter-spacing:.8px;margin-bottom:3px;">ERRORS</div>
+        <input id="tlx-errors" type="number" min="0" step="1" placeholder="0" class="field-input" style="font-size:.68rem;padding:5px 8px;width:100%;box-sizing:border-box;background:rgba(0,0,0,.4);border:1px solid rgba(0,229,255,.15);border-radius:6px;color:#8aacbe;">
+      </div>
+      <div>
+        <div style="color:#445;font-size:.58rem;letter-spacing:.8px;margin-bottom:3px;">AI PROMPTS USED</div>
+        <input id="tlx-ai-prompts" type="number" min="0" step="1" placeholder="0" class="field-input" style="font-size:.68rem;padding:5px 8px;width:100%;box-sizing:border-box;background:rgba(0,0,0,.4);border:1px solid rgba(0,229,255,.15);border-radius:6px;color:#8aacbe;">
+      </div>
+    </div>
+
+    <!-- NASA-TLX Sliders -->
+    <div style="margin-top:13px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+      <div class="tlx-slider-row">
+        <label style="color:#8aacbe;font-size:.62rem;letter-spacing:.7px;">MENTAL DEMAND <span id="tlx-mental-val" style="color:var(--cyan);float:right;">50</span></label>
+        <input type="range" id="tlx-mental" min="0" max="100" value="50" style="width:100%;accent-color:var(--cyan);margin-top:3px;">
+        <div style="color:#334;font-size:.54rem;">Low ← → High</div>
+      </div>
+      <div class="tlx-slider-row">
+        <label style="color:#8aacbe;font-size:.62rem;letter-spacing:.7px;">PHYSICAL DEMAND <span id="tlx-physical-val" style="color:var(--green);float:right;">50</span></label>
+        <input type="range" id="tlx-physical" min="0" max="100" value="50" style="width:100%;accent-color:var(--green);margin-top:3px;">
+        <div style="color:#334;font-size:.54rem;">Low ← → High</div>
+      </div>
+      <div class="tlx-slider-row">
+        <label style="color:#8aacbe;font-size:.62rem;letter-spacing:.7px;">TEMPORAL DEMAND <span id="tlx-temporal-val" style="color:var(--amber);float:right;">50</span></label>
+        <input type="range" id="tlx-temporal" min="0" max="100" value="50" style="width:100%;accent-color:var(--amber);margin-top:3px;">
+        <div style="color:#334;font-size:.54rem;">Low ← → High</div>
+      </div>
+      <div class="tlx-slider-row">
+        <label style="color:#8aacbe;font-size:.62rem;letter-spacing:.7px;">PERFORMANCE <span id="tlx-performance-val" style="color:var(--magenta);float:right;">50</span></label>
+        <input type="range" id="tlx-performance" min="0" max="100" value="50" style="width:100%;accent-color:var(--magenta);margin-top:3px;">
+        <div style="color:#334;font-size:.54rem;">Poor ← → Good</div>
+      </div>
+      <div class="tlx-slider-row">
+        <label style="color:#8aacbe;font-size:.62rem;letter-spacing:.7px;">EFFORT <span id="tlx-effort-val" style="color:var(--cyan);float:right;">50</span></label>
+        <input type="range" id="tlx-effort" min="0" max="100" value="50" style="width:100%;accent-color:var(--cyan);margin-top:3px;">
+        <div style="color:#334;font-size:.54rem;">Low ← → High</div>
+      </div>
+      <div class="tlx-slider-row">
+        <label style="color:#8aacbe;font-size:.62rem;letter-spacing:.7px;">FRUSTRATION <span id="tlx-frustration-val" style="color:var(--red);float:right;">50</span></label>
+        <input type="range" id="tlx-frustration" min="0" max="100" value="50" style="width:100%;accent-color:var(--red);margin-top:3px;">
+        <div style="color:#334;font-size:.54rem;">Low ← → High</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding:8px 12px;background:rgba(0,229,255,.05);border-radius:8px;border:1px solid rgba(0,229,255,.1);flex-wrap:wrap;gap:8px;">
+      <span style="color:#445;font-size:.62rem;letter-spacing:.7px;">OVERALL NASA-TLX (Raw Average)</span>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span id="tlx-classification" style="font-size:.64rem;font-family:'Share Tech Mono',monospace;letter-spacing:1px;padding:3px 10px;border-radius:12px;border:1px solid rgba(255,179,0,.4);color:var(--amber);background:rgba(255,179,0,.08);">MODERATE</span>
+        <span id="tlx-overall" style="color:var(--amber);font-size:1.1rem;font-family:'Share Tech Mono',monospace;font-weight:700;">50.0</span>
+      </div>
+    </div>
+    <div style="font-size:.56rem;color:#445;margin-top:6px;line-height:1.5;">
+      Load bands (Relaxed &lt;20 &middot; Low 20&ndash;40 &middot; Moderate 40&ndash;70 &middot; High &gt;70) are <b style="color:#667;">heuristic defaults</b>, not validated cutoffs &mdash; calibrate them against your own participant data before drawing conclusions.
+    </div>
+
+    <!-- Saved NASA-TLX submissions log (one row per completed task rating) -->
+    <div style="margin-top:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span style="color:#445;font-size:.58rem;letter-spacing:.8px;">SAVED RATINGS THIS SESSION</span>
+        <span id="tlx-history-count" style="color:#667;font-size:.58rem;font-family:'Share Tech Mono',monospace;">0 SAVED</span>
+      </div>
+      <div id="tlx-history-list" style="margin-top:6px;max-height:120px;overflow-y:auto;font-family:'Share Tech Mono',monospace;font-size:.6rem;color:#667;">
+        <div style="color:#334;padding:6px 0;">No ratings saved yet — rate the task below, then press SAVE TO EXPORT.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     LSTM REAL-TIME COGNITIVE PREDICTION ENGINE PANEL
+     Fully client-side LSTM implemented in pure JavaScript (no server).
+     Trains on your live oculometric session data in the browser.
+     ══════════════════════════════════════════════════════════════════ -->
+<div class="lstm-panel" id="lstmPanel">
+
+  <!-- Title Row -->
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+    <div class="ptitle" style="color:var(--magenta);margin-bottom:0;">
+      <i class="fas fa-brain"></i>
+      LSTM NEURAL PREDICTION ENGINE
+      <span style="font-size:.55rem;color:#556;letter-spacing:1px;font-family:'Share Tech Mono',monospace;margin-left:8px;">REAL-TIME · CLIENT-SIDE · PURE JS</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <span class="lstm-badge training" id="lstmStatusBadge"><i class="fas fa-circle-notch fa-spin" style="font-size:.55rem;"></i> INITIALIZING</span>
+      <span class="lstm-badge none" id="lstmEpochBadge">EPOCH 0/0</span>
+      <button class="btn bm" id="lstmTrainBtn" style="font-size:.66rem;padding:6px 13px;" title="Retrain LSTM on current session data">
+        <i class="fas fa-cogs"></i> TRAIN NOW
+      </button>
+      <button class="btn bc" id="lstmResetBtn" style="font-size:.66rem;padding:6px 13px;">
+        <i class="fas fa-redo"></i> RESET
+      </button>
+    </div>
+  </div>
+
+  <!-- Epoch progress bar -->
+  <div class="lstm-epoch-bar">
+    <span style="color:#445;">TRAINING PROGRESS</span>
+    <div class="lstm-epoch-track"><div class="lstm-epoch-fill" id="lstmEpochFill"></div></div>
+    <span id="lstmLossVal">LOSS: —</span>
+    <span id="lstmAccVal">ACC: —</span>
+  </div>
+
+  <!-- 4 Prediction Cards -->
+  <div class="lstm-grid">
+
+    <!-- Fatigue Prediction -->
+    <div class="lstm-card">
+      <div class="lstm-card-title" style="color:var(--red);">
+        <span><i class="fas fa-eye-slash" style="margin-right:5px;font-size:.6rem;"></i>FATIGUE FORECAST</span>
+        <span style="font-size:.55rem;color:#445;font-family:'Share Tech Mono',monospace;">+30s</span>
+      </div>
+      <div class="lstm-pred-val" id="lstmFatiguePred" style="color:var(--red);">—</div>
+      <div class="lstm-conf" id="lstmFatigueConf">CONFIDENCE: —</div>
+      <div class="lstm-trend-bar"><div class="lstm-trend-fill" id="lstmFatigueFill" style="background:var(--red);width:0%;"></div></div>
+      <div style="margin-top:8px;font-size:.58rem;color:#445;font-family:'Share Tech Mono',monospace;" id="lstmFatigueAlert">—</div>
+    </div>
+
+    <!-- Cognitive Load Prediction -->
+    <div class="lstm-card">
+      <div class="lstm-card-title" style="color:var(--cyan);">
+        <span><i class="fas fa-microchip" style="margin-right:5px;font-size:.6rem;"></i>COG LOAD FORECAST</span>
+        <span style="font-size:.55rem;color:#445;font-family:'Share Tech Mono',monospace;">+30s</span>
+      </div>
+      <div class="lstm-pred-val" id="lstmCogPred" style="color:var(--cyan);">—</div>
+      <div class="lstm-conf" id="lstmCogConf">CONFIDENCE: —</div>
+      <div class="lstm-trend-bar"><div class="lstm-trend-fill" id="lstmCogFill" style="background:var(--cyan);width:0%;"></div></div>
+      <div style="margin-top:8px;font-size:.58rem;color:#445;font-family:'Share Tech Mono',monospace;" id="lstmCogAlert">—</div>
+    </div>
+
+    <!-- Attention Forecast -->
+    <div class="lstm-card">
+      <div class="lstm-card-title" style="color:var(--green);">
+        <span><i class="fas fa-crosshairs" style="margin-right:5px;font-size:.6rem;"></i>ATTENTION FORECAST</span>
+        <span style="font-size:.55rem;color:#445;font-family:'Share Tech Mono',monospace;">+30s</span>
+      </div>
+      <div class="lstm-pred-val" id="lstmAttnPred" style="color:var(--green);">—</div>
+      <div class="lstm-conf" id="lstmAttnConf">CONFIDENCE: —</div>
+      <div class="lstm-trend-bar"><div class="lstm-trend-fill" id="lstmAttnFill" style="background:var(--green);width:0%;"></div></div>
+      <div style="margin-top:8px;font-size:.58rem;color:#445;font-family:'Share Tech Mono',monospace;" id="lstmAttnAlert">—</div>
+    </div>
+
+    <!-- Blink Rate Forecast -->
+    <div class="lstm-card">
+      <div class="lstm-card-title" style="color:var(--amber);">
+        <span><i class="fas fa-wave-square" style="margin-right:5px;font-size:.6rem;"></i>BLINK RATE FORECAST</span>
+        <span style="font-size:.55rem;color:#445;font-family:'Share Tech Mono',monospace;">+30s</span>
+      </div>
+      <div class="lstm-pred-val" id="lstmBlinkPred" style="color:var(--amber);">—</div>
+      <div class="lstm-conf" id="lstmBlinkConf">CONFIDENCE: —</div>
+      <div class="lstm-trend-bar"><div class="lstm-trend-fill" id="lstmBlinkFill" style="background:var(--amber);width:0%;"></div></div>
+      <div style="margin-top:8px;font-size:.58rem;color:#445;font-family:'Share Tech Mono',monospace;" id="lstmBlinkAlert">—</div>
+    </div>
+
+    <!-- Cognitive Risk (derived analytically from Fatigue/Attn/PERCLOS trajectories,
+         NOT its own raw-feature regression — see Neuromia_Scientific_Redesign.md
+         Section 8.2 for why Risk is a meta-construct rather than a fifth model) -->
+    <div class="lstm-card">
+      <div class="lstm-card-title" style="color:var(--magenta);">
+        <span><i class="fas fa-triangle-exclamation" style="margin-right:5px;font-size:.6rem;"></i>COGNITIVE RISK</span>
+        <span style="font-size:.55rem;color:#445;font-family:'Share Tech Mono',monospace;">LIVE</span>
+      </div>
+      <div class="lstm-pred-val" id="lstmRiskPred" style="color:var(--magenta);">—</div>
+      <div class="lstm-conf" id="lstmRiskConf">CONFIDENCE: —</div>
+      <div class="lstm-trend-bar"><div class="lstm-trend-fill" id="lstmRiskFill" style="background:var(--magenta);width:0%;"></div></div>
+      <div style="margin-top:8px;font-size:.58rem;color:#445;font-family:'Share Tech Mono',monospace;" id="lstmRiskAlert">—</div>
+    </div>
+
+  </div><!-- /lstm-grid -->
+
+  <!-- LSTM Prediction Time-series Chart -->
+  <div class="lstm-main-chart-wrap">
+    <div class="ptitle" style="font-size:.6rem;margin-bottom:8px;color:var(--magenta);">
+      <i class="fas fa-chart-line"></i> LSTM PREDICTION VS ACTUAL — LIVE TRACKING
+      <span id="lstmChartMode" style="margin-left:auto;font-family:'Share Tech Mono',monospace;font-size:.55rem;color:#445;">WAITING FOR DATA</span>
+    </div>
+    <div class="lstm-chart-inner"><canvas id="lstmPredChart"></canvas></div>
+  </div>
+
+  <!-- Hidden-state cell visualiser -->
+  <div class="lstm-seq-wrap">
+    <div class="lstm-seq-label"><i class="fas fa-project-diagram" style="margin-right:7px;"></i>LSTM HIDDEN STATE ACTIVATIONS — CELL MEMORY UNITS</div>
+    <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <div style="font-size:.58rem;color:#445;font-family:'Share Tech Mono',monospace;margin-bottom:6px;">CELL STATE (c)</div>
+        <div class="lstm-cells" id="lstmCellC"></div>
+      </div>
+      <div style="flex:1;min-width:200px;">
+        <div style="font-size:.58rem;color:#445;font-family:'Share Tech Mono',monospace;margin-bottom:6px;">HIDDEN STATE (h)</div>
+        <div class="lstm-cells" id="lstmCellH"></div>
+      </div>
+      <div style="flex:1;min-width:200px;">
+        <div style="font-size:.58rem;color:#445;font-family:'Share Tech Mono',monospace;margin-bottom:6px;">OUTPUT GATE (o)</div>
+        <div class="lstm-cells" id="lstmCellO"></div>
+      </div>
+      <div style="flex:1;min-width:200px;">
+        <div style="font-size:.58rem;color:#445;font-family:'Share Tech Mono',monospace;margin-bottom:6px;">FORGET GATE (f)</div>
+        <div class="lstm-cells" id="lstmCellF"></div>
+      </div>
+    </div>
+    <div style="margin-top:10px;font-size:.58rem;color:#334;font-family:'Share Tech Mono',monospace;line-height:1.6;">
+      Each bar = one LSTM unit activation (–1 to +1). Blue = positive. Red = negative. Updated every prediction cycle.
+      Input features: Blink Rate · Gaze Stability · Attention · PERCLOS · EAR · Saccade · Fixation Density · Eye Strain.
+    </div>
+  </div>
+
+  <!-- Overall alert -->
+  <div id="lstmGlobalAlert" class="lstm-alert-tag none" style="display:none;">
+    <i class="fas fa-exclamation-triangle"></i> <span id="lstmGlobalAlertText"></span>
+  </div>
+
+  <div style="margin-top:10px;font-size:.58rem;color:#334;font-family:'Share Tech Mono',monospace;line-height:1.6;">
+    Model: 2-layer LSTM · 24 units · seq_len=10 · features=8 · Adam optimizer · trained fully in-browser on live session data.
+    Predictions update every 2 seconds using latest window. All values are oculometric-derived (no fake data).
+  </div>
+
+</div><!-- /lstm-panel -->
+
+<!-- ════════════════════════════════════════════
+     FMG — FACIAL MUSCLE GROUP REAL-TIME PANEL
+     10 indices: FAI · CBI · JCI · SmileIdx · LPI · MAR · CCI · NWI · HPS · MEF
+     Computed from MediaPipe 468 landmarks — no fake data, real-time geometry only
+     ════════════════════════════════════════════ -->
+<div class="fmg-panel" id="fmgPanel">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+    <div class="ptitle" style="color:var(--amber);margin-bottom:0;">
+      <i class="fas fa-face-smile-beam"></i>
+      FMG — FACIAL MUSCLE GROUP ANALYSIS
+      <span style="font-size:.55rem;color:#556;letter-spacing:1px;font-family:'Share Tech Mono',monospace;margin-left:8px;">REAL-TIME · 10 INDICES · MediaPipe 468-LM</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <span class="fmg-baseline-badge calibrating" id="fmgBaselineBadge">
+        <i class="fas fa-circle-notch fa-spin" style="font-size:.5rem;"></i> CALIBRATING BASELINE…
+      </span>
+    </div>
+  </div>
+
+  <!-- 10 FMG Metric Cards (5 × 2) -->
+  <div class="fmg-grid">
+
+    <!-- 1. FAI — Frontalis / Eyebrow Raise -->
+    <div class="fmg-card">
+      <div class="fmg-card-label">FAI</div>
+      <div class="fmg-card-muscle">Frontalis · Eyebrow Raise</div>
+      <div class="fmg-val" id="fmgFAI" style="color:var(--cyan);">—</div>
+      <div class="fmg-detect" id="fmgFAILabel">Surprise · Attention · Effort</div>
+      <div class="fmg-bar-track"><div class="fmg-bar-fill" id="fmgFAIFill" style="width:0%;background:var(--cyan);"></div></div>
+    </div>
+
+    <!-- 2. CBI — Corrugator / Brow Furrow -->
+    <div class="fmg-card">
+      <div class="fmg-card-label">CBI</div>
+      <div class="fmg-card-muscle">Corrugator · Brow Furrow</div>
+      <div class="fmg-val" id="fmgCBI" style="color:var(--green);">—</div>
+      <div class="fmg-detect" id="fmgCBILabel">FURROW: 0%</div>
+      <div class="fmg-bar-track"><div class="fmg-bar-fill" id="fmgCBIFill" style="width:0%;background:var(--red);"></div></div>
+    </div>
+
+    <!-- 3. JCI — Masseter / Jaw Clench -->
+    <div class="fmg-card">
+      <div class="fmg-card-label">JCI</div>
+      <div class="fmg-card-muscle">Masseter · Jaw Clench</div>
+      <div class="fmg-val" id="fmgJCI" style="color:var(--green);">—</div>
+      <div class="fmg-detect" id="fmgJCILabel">CLENCH: 0%</div>
+      <div class="fmg-bar-track"><div class="fmg-bar-fill" id="fmgJCIFill" style="width:0%;background:var(--red);"></div></div>
+    </div>
+
+    <!-- 4. SmileIndex — Zygomaticus / Smile -->
+    <div class="fmg-card">
+      <div class="fmg-card-label">SMILE IDX</div>
+      <div class="fmg-card-muscle">Zygomaticus · Smile / Joy</div>
+      <div class="fmg-val" id="fmgSmile" style="color:var(--green);">—</div>
+      <div class="fmg-detect" id="fmgSmileLabel">ACTIVE: 0%</div>
+      <div class="fmg-bar-track"><div class="fmg-bar-fill" id="fmgSmileFill" style="width:0%;background:var(--green);"></div></div>
+    </div>
+
+    <!-- 5. LPI — Orbicularis Oris / Lip Pucker -->
+    <div class="fmg-card">
+      <div class="fmg-card-label">LPI</div>
+      <div class="fmg-card-muscle">Orbicularis Oris · Lip Pucker</div>
+      <div class="fmg-val" id="fmgLPI" style="color:var(--cyan);">—</div>
+      <div class="fmg-detect" id="fmgLPILabel">PUCKER: 0%</div>
+      <div class="fmg-bar-track"><div class="fmg-bar-fill" id="fmgLPIFill" style="width:0%;background:var(--amber);"></div></div>
+    </div>
+
+    <!-- 6. MAR — Mouth Opening / Yawn -->
+    <div class="fmg-card">
+      <div class="fmg-card-label">MAR</div>
+      <div class="fmg-card-muscle">Mouth Opening · Yawn / MAR</div>
+      <div class="fmg-val" id="fmgMAR" style="color:var(--cyan);">—</div>
+      <div class="fmg-detect" id="fmgMARLabel">OPENING: LOW</div>
+      <div class="fmg-bar-track"><div class="fmg-bar-fill" id="fmgMARFill" style="width:0%;background:var(--magenta);"></div></div>
+    </div>
+
+    <!-- 7. CCI — Buccinator / Cheek Compression -->
+    <div class="fmg-card">
+      <div class="fmg-card-label">CCI</div>
+      <div class="fmg-card-muscle">Buccinator · Cheek Compress</div>
+      <div class="fmg-val" id="fmgCCI" style="color:var(--cyan);">—</div>
+      <div class="fmg-detect">Stress · Jaw tension</div>
+      <div class="fmg-bar-track"><div class="fmg-bar-fill" id="fmgCCIFill" style="width:0%;background:var(--amber);"></div></div>
+    </div>
+
+    <!-- 8. NWI — Levator Labii / Nose Wrinkle -->
+    <div class="fmg-card">
+      <div class="fmg-card-label">NWI</div>
+      <div class="fmg-card-muscle">Levator Labii · Nose Wrinkle</div>
+      <div class="fmg-val" id="fmgNWI" style="color:var(--cyan);">—</div>
+      <div class="fmg-detect">Disgust · Cognitive discomfort</div>
+      <div class="fmg-bar-track"><div class="fmg-bar-fill" id="fmgNWIFill" style="width:0%;background:var(--magenta);"></div></div>
+    </div>
+
+    <!-- 9. HPS — Head Pose Stability -->
+    <div class="fmg-card">
+      <div class="fmg-card-label">HPS</div>
+      <div class="fmg-card-muscle">Head Pose · √(P²+Y²+R²)</div>
+      <div class="fmg-val" id="fmgHPS" style="color:var(--green);">—</div>
+      <div class="fmg-detect">Attention drift · Distraction</div>
+      <div class="fmg-bar-track"><div class="fmg-bar-fill" id="fmgHPSFill" style="width:0%;background:var(--amber);"></div></div>
+    </div>
+
+    <!-- 10. MEF — Micro-expression Frequency -->
+    <div class="fmg-card">
+      <div class="fmg-card-label">MEF</div>
+      <div class="fmg-card-muscle">Micro-Expression Freq · /min</div>
+      <div class="fmg-val" id="fmgMEF" style="color:var(--cyan);">—</div>
+      <div class="fmg-detect">Hidden emotions · Stress spikes</div>
+      <div class="fmg-bar-track"><div class="fmg-bar-fill" id="fmgMEFFill" style="width:0%;background:var(--red);"></div></div>
+    </div>
+
+  </div><!-- /fmg-grid -->
+
+  <!-- Formula Reference Row -->
+  <div style="margin-top:14px;padding:11px 16px;background:rgba(0,0,0,.22);border-radius:8px;border:1px solid rgba(255,255,255,.04);">
+    <div style="font-family:'Orbitron',monospace;font-size:.55rem;letter-spacing:2px;color:var(--amber);opacity:.7;margin-bottom:7px;">FORMULA REFERENCE · ALL INDICES NORMALIZED TO PERSONAL BASELINE</div>
+    <div style="display:flex;flex-wrap:wrap;gap:14px;font-family:'Share Tech Mono',monospace;font-size:.58rem;color:#445;line-height:1.8;">
+      <span style="color:#556;">FAI = (d<sub>brow-eye</sub> − d<sub>bl</sub>) / d<sub>bl</sub></span>
+      <span style="color:#224;">│</span>
+      <span style="color:#556;">CBI = d<sub>brow-center</sub> / d<sub>bl</sub></span>
+      <span style="color:#224;">│</span>
+      <span style="color:#556;">JCI = JawWidth / JawWidth<sub>bl</sub></span>
+      <span style="color:#224;">│</span>
+      <span style="color:#556;">SmileIdx = MouthSpread / FaceWidth</span>
+      <span style="color:#224;">│</span>
+      <span style="color:#556;">LPI = LipH / MouthW</span>
+      <span style="color:#224;">│</span>
+      <span style="color:#556;">MAR = d<sub>upper-lower lip</sub> / d<sub>mouth width</sub></span>
+      <span style="color:#224;">│</span>
+      <span style="color:#556;">CCI = CheekDist / Baseline</span>
+      <span style="color:#224;">│</span>
+      <span style="color:#556;">NWI = NoseDist / Baseline</span>
+      <span style="color:#224;">│</span>
+      <span style="color:#556;">HPS = √(Pitch² + Yaw² + Roll²)</span>
+      <span style="color:#224;">│</span>
+      <span style="color:#556;">MEF = MicroExpressions / min</span>
+    </div>
+  </div>
+
+</div><!-- /fmg-panel -->
+
+<!-- ════════════════════════════════════════════
+     EMOTION STATE ENGINE PANEL
+     8 states: Joy · Neutral · Stress · Frustration · Confusion · Fatigue · Anxiety · Surprise
+     FMG-derived real-time inference — no training required
+     ════════════════════════════════════════════ -->
+<div class="emo-panel" id="emotionPanel">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+    <div class="ptitle" style="color:var(--cyan);margin-bottom:0;">
+      <i class="fas fa-heart-pulse"></i>
+      REAL-TIME EMOTION STATE ENGINE
+      <span style="font-size:.55rem;color:#556;letter-spacing:1px;font-family:'Share Tech Mono',monospace;margin-left:8px;">8 STATES · FMG-DERIVED · LIVE · NO ML TRAINING</span>
+    </div>
+    <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:#334;letter-spacing:1px;padding:3px 10px;border:1px solid rgba(0,229,255,.1);border-radius:9px;">
+      SOURCE: FMG LANDMARK GEOMETRY
+    </div>
+  </div>
+
+  <!-- Dominant Emotion Display -->
+  <div class="dominant-emo">
+    <div class="dom-emo-icon" id="domEmoIcon">😐</div>
+    <div>
+      <div class="dom-emo-label" id="domEmoName" style="color:var(--cyan);">NEUTRAL</div>
+      <div class="dom-emo-sub">DOMINANT EMOTION STATE · REAL-TIME</div>
+    </div>
+    <div class="dom-emo-conf">
+      <div class="dom-emo-conf-val" id="domEmoConf" style="color:var(--cyan);">—</div>
+      <div class="dom-emo-conf-lbl">CONFIDENCE</div>
+    </div>
+  </div>
+
+  <!-- 8 Emotion Cards (4 × 2) -->
+  <div class="emo-grid">
+
+    <!-- JOY — High -->
+    <div class="emo-card">
+      <div class="emo-name" style="color:var(--green);">JOY</div>
+      <div class="emo-importance" style="border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.07);color:var(--green);">
+        <i class="fas fa-circle" style="font-size:.42rem;"></i> HIGH
+      </div>
+      <div class="emo-prob" id="emoJoyVal" style="color:var(--green);">—</div>
+      <div class="emo-bar-track"><div class="emo-bar-fill" id="emoJoyFill" style="width:0%;background:var(--green);"></div></div>
+      <div style="font-size:.54rem;color:#445;font-family:'Share Tech Mono',monospace;margin-top:5px;">SmileIdx · Zygomaticus</div>
+    </div>
+
+    <!-- NEUTRAL — High -->
+    <div class="emo-card">
+      <div class="emo-name" style="color:var(--cyan);">NEUTRAL</div>
+      <div class="emo-importance" style="border-color:rgba(0,229,255,.3);background:rgba(0,229,255,.07);color:var(--cyan);">
+        <i class="fas fa-circle" style="font-size:.42rem;"></i> HIGH
+      </div>
+      <div class="emo-prob" id="emoNeutralVal" style="color:var(--cyan);">—</div>
+      <div class="emo-bar-track"><div class="emo-bar-fill" id="emoNeutralFill" style="width:0%;background:var(--cyan);"></div></div>
+      <div style="font-size:.54rem;color:#445;font-family:'Share Tech Mono',monospace;margin-top:5px;">Baseline reference state</div>
+    </div>
+
+    <!-- STRESS — Very High -->
+    <div class="emo-card">
+      <div class="emo-name" style="color:var(--red);">STRESS</div>
+      <div class="emo-importance" style="border-color:rgba(255,45,85,.4);background:rgba(255,45,85,.08);color:var(--red);">
+        <i class="fas fa-exclamation" style="font-size:.42rem;"></i> VERY HIGH
+      </div>
+      <div class="emo-prob" id="emoStressVal" style="color:var(--red);">—</div>
+      <div class="emo-bar-track"><div class="emo-bar-fill" id="emoStressFill" style="width:0%;background:var(--red);"></div></div>
+      <div style="font-size:.54rem;color:#445;font-family:'Share Tech Mono',monospace;margin-top:5px;">CBI · JCI · MEF · HPS</div>
+    </div>
+
+    <!-- FRUSTRATION — Very High -->
+    <div class="emo-card">
+      <div class="emo-name" style="color:#ff6600;">FRUSTRATION</div>
+      <div class="emo-importance" style="border-color:rgba(255,102,0,.4);background:rgba(255,102,0,.08);color:#ff6600;">
+        <i class="fas fa-exclamation" style="font-size:.42rem;"></i> VERY HIGH
+      </div>
+      <div class="emo-prob" id="emoFrustrationVal" style="color:#ff6600;">—</div>
+      <div class="emo-bar-track"><div class="emo-bar-fill" id="emoFrustrationFill" style="width:0%;background:#ff6600;"></div></div>
+      <div style="font-size:.54rem;color:#445;font-family:'Share Tech Mono',monospace;margin-top:5px;">CBI · No smile · JCI</div>
+    </div>
+
+    <!-- CONFUSION — Very High -->
+    <div class="emo-card">
+      <div class="emo-name" style="color:var(--amber);">CONFUSION</div>
+      <div class="emo-importance" style="border-color:rgba(255,179,0,.4);background:rgba(255,179,0,.08);color:var(--amber);">
+        <i class="fas fa-exclamation" style="font-size:.42rem;"></i> VERY HIGH
+      </div>
+      <div class="emo-prob" id="emoConfusionVal" style="color:var(--amber);">—</div>
+      <div class="emo-bar-track"><div class="emo-bar-fill" id="emoConfusionFill" style="width:0%;background:var(--amber);"></div></div>
+      <div style="font-size:.54rem;color:#445;font-family:'Share Tech Mono',monospace;margin-top:5px;">LPI · CBI · FAI · HPS</div>
+    </div>
+
+    <!-- FATIGUE — Critical -->
+    <div class="emo-card" style="border-color:rgba(255,0,170,.12);">
+      <div class="emo-name" style="color:var(--magenta);">FATIGUE</div>
+      <div class="emo-importance" style="border-color:rgba(255,0,170,.5);background:rgba(255,0,170,.1);color:var(--magenta);">
+        <i class="fas fa-skull-crossbones" style="font-size:.42rem;"></i> CRITICAL
+      </div>
+      <div class="emo-prob" id="emoFatigueVal" style="color:var(--magenta);">—</div>
+      <div class="emo-bar-track"><div class="emo-bar-fill" id="emoFatigueFill" style="width:0%;background:var(--magenta);"></div></div>
+      <div style="font-size:.54rem;color:#445;font-family:'Share Tech Mono',monospace;margin-top:5px;">MAR · Yawn · Drowsiness</div>
+    </div>
+
+    <!-- ANXIETY — High -->
+    <div class="emo-card">
+      <div class="emo-name" style="color:#aa44ff;">ANXIETY</div>
+      <div class="emo-importance" style="border-color:rgba(170,68,255,.4);background:rgba(170,68,255,.08);color:#aa44ff;">
+        <i class="fas fa-circle" style="font-size:.42rem;"></i> HIGH
+      </div>
+      <div class="emo-prob" id="emoAnxietyVal" style="color:#aa44ff;">—</div>
+      <div class="emo-bar-track"><div class="emo-bar-fill" id="emoAnxietyFill" style="width:0%;background:#aa44ff;"></div></div>
+      <div style="font-size:.54rem;color:#445;font-family:'Share Tech Mono',monospace;margin-top:5px;">JCI · FAI · MEF</div>
+    </div>
+
+    <!-- SURPRISE — Medium -->
+    <div class="emo-card">
+      <div class="emo-name" style="color:var(--cyan);">SURPRISE</div>
+      <div class="emo-importance" style="border-color:rgba(0,229,255,.2);background:rgba(0,229,255,.04);color:#556;">
+        <i class="fas fa-circle" style="font-size:.42rem;"></i> MEDIUM
+      </div>
+      <div class="emo-prob" id="emoSurpriseVal" style="color:var(--cyan);">—</div>
+      <div class="emo-bar-track"><div class="emo-bar-fill" id="emoSurpriseFill" style="width:0%;background:var(--cyan);opacity:.7;"></div></div>
+      <div style="font-size:.54rem;color:#445;font-family:'Share Tech Mono',monospace;margin-top:5px;">FAI · MAR · Brow raise</div>
+    </div>
+
+  </div><!-- /emo-grid -->
+
+  <div style="margin-top:12px;font-size:.58rem;color:#334;font-family:'Share Tech Mono',monospace;line-height:1.65;">
+    Emotion inference uses weighted multi-feature scoring from FMG indices.
+    No ML training required — pure real-time landmark geometry.
+    <span style="color:var(--red);">Critical: Fatigue</span> <span style="color:#224;">·</span>
+    <span style="color:var(--amber);">Very High: Stress, Frustration, Confusion</span> <span style="color:#224;">·</span>
+    <span style="color:var(--cyan);">High: Joy, Neutral, Anxiety</span> <span style="color:#224;">·</span>
+    <span style="color:#445;">Medium: Surprise</span>
+  </div>
+
+</div><!-- /emo-panel -->
+
+</div><!-- /app -->
+
+<!-- ════════════════════════════════════════════
+     REGISTRATION MODAL
+     ════════════════════════════════════════════ -->
+<div id="regOverlay">
+  <div class="reg-modal" role="dialog" aria-modal="true" aria-labelledby="regModalTitle">
+
+    <!-- HEADER -->
+    <div class="reg-header">
+      <div class="reg-title-row">
+        <div>
+          <div class="reg-title" id="regModalTitle">SUBJECT REGISTRATION</div>
+          <div class="reg-subtitle">NEUROMIA COGNITIVE INTELLIGENCE SYSTEM — SUBJECT ENROLLMENT</div>
+        </div>
+        <button class="reg-close" id="regCloseBtn" aria-label="Close registration"><i class="fas fa-times"></i></button>
+      </div>
+
+      <!-- Step indicators -->
+      <div class="reg-steps" id="regStepsIndicator">
+        <div class="reg-step active" id="si0">
+          <div class="step-num">01</div>
+          <div class="step-label">IDENTITY</div>
+        </div>
+        <div class="step-line" id="sl01"></div>
+        <div class="reg-step" id="si1">
+          <div class="step-num">02</div>
+          <div class="step-label">PROFILE</div>
+        </div>
+        <div class="step-line" id="sl12"></div>
+        <div class="reg-step" id="si2">
+          <div class="step-num">03</div>
+          <div class="step-label">CONSENT</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BODY -->
+    <div class="reg-body">
+
+      <!-- STEP 1: IDENTITY -->
+      <div class="reg-step-panel show" id="regPanel0">
+        <div class="form-section"><i class="fas fa-id-card"></i> PERSONAL IDENTITY</div>
+        <div class="field-row">
+          <div class="field-group">
+            <label class="field-label"><span class="req">*</span> FIRST NAME</label>
+            <input class="field-input" id="f-first" type="text" placeholder="e.g. Sarah" autocomplete="given-name">
+            <div class="field-error" id="e-first"></div>
+          </div>
+          <div class="field-group">
+            <label class="field-label"><span class="req">*</span> LAST NAME</label>
+            <input class="field-input" id="f-last" type="text" placeholder="e.g. Chen" autocomplete="family-name">
+            <div class="field-error" id="e-last"></div>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field-group">
+            <label class="field-label"><span class="req">*</span> DATE OF BIRTH</label>
+            <input class="field-input" id="f-dob" type="date" autocomplete="bday">
+            <div class="field-error" id="e-dob"></div>
+          </div>
+          <div class="field-group">
+            <label class="field-label"><span class="req">*</span> GENDER</label>
+            <select class="field-input" id="f-gender">
+              <option value="">Select...</option>
+              <option value="Female">Female</option>
+              <option value="Male">Male</option>
+              <option value="Non-binary">Non-binary</option>
+              <option value="Prefer not to say">Prefer not to say</option>
+            </select>
+            <div class="field-error" id="e-gender"></div>
+          </div>
+        </div>
+        <div class="field-row full">
+          <div class="field-group">
+            <label class="field-label"><span class="req">*</span> EMAIL ADDRESS</label>
+            <input class="field-input" id="f-email" type="email" placeholder="subject@domain.com" autocomplete="email">
+            <div class="field-error" id="e-email"></div>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field-group">
+            <label class="field-label">PHONE NUMBER</label>
+            <input class="field-input" id="f-phone" type="tel" placeholder="+91 9876 543210" autocomplete="tel">
+            <div class="field-error" id="e-phone"></div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">ORGANIZATION</label>
+            <input class="field-input" id="f-org" type="text" placeholder="University / Institution">
+            <div class="field-error" id="e-org"></div>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field-group">
+            <label class="field-label"><span class="req">*</span> PARTICIPANT ID</label>
+            <input class="field-input" id="f-subject-id" type="text" placeholder="e.g. P001" value="P001">
+            <div class="field-error" id="e-subject-id"></div>
+          </div>
+          <div class="field-group">
+            <label class="field-label"><span class="req">*</span> SESSION ID</label>
+            <input class="field-input" id="f-session-id" type="number" min="1" placeholder="e.g. 1" value="1">
+            <div class="field-error" id="e-session-id"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2: PROFILE -->
+      <div class="reg-step-panel" id="regPanel1">
+        <div class="form-section"><i class="fas fa-brain"></i> NEUROLOGICAL PROFILE</div>
+        <div class="field-row">
+          <div class="field-group">
+            <label class="field-label"><span class="req">*</span> HANDEDNESS</label>
+            <select class="field-input" id="f-hand">
+              <option value="">Select...</option>
+              <option value="Right-handed">Right-handed</option>
+              <option value="Left-handed">Left-handed</option>
+              <option value="Ambidextrous">Ambidextrous</option>
+            </select>
+            <div class="field-error" id="e-hand"></div>
+          </div>
+          <div class="field-group">
+            <label class="field-label"><span class="req">*</span> STUDY ROLE</label>
+            <select class="field-input" id="f-role">
+              <option value="">Select...</option>
+              <option value="Research Subject">Research Subject</option>
+              <option value="Control Group">Control Group</option>
+              <option value="Clinical Patient">Clinical Patient</option>
+              <option value="Researcher">Researcher</option>
+              <option value="Operator">Operator</option>
+            </select>
+            <div class="field-error" id="e-role"></div>
+          </div>
+        </div>
+        <div class="field-row full">
+          <div class="field-group">
+            <label class="field-label">NEUROLOGICAL CONDITIONS (if any)</label>
+            <input class="field-input" id="f-conditions" type="text" placeholder="e.g. None, Epilepsy (controlled), Mild ADHD">
+            <div class="field-error" id="e-conditions"></div>
+          </div>
+        </div>
+        <div class="field-row" style="grid-template-columns: 1fr 1fr 1fr;">
+          <div class="field-group">
+            <label class="field-label"><span class="req">*</span> SLEEP HOURS</label>
+            <input class="field-input" id="f-sleep" type="number" step="0.5" min="0" max="24" placeholder="e.g. 7.5" value="7.5">
+            <div class="field-error" id="e-sleep"></div>
+          </div>
+          <div class="field-group">
+            <label class="field-label"><span class="req">*</span> CAFFEINE TODAY</label>
+            <select class="field-input" id="f-caffeine">
+              <option value="No">No</option>
+              <option value="Yes" selected>Yes</option>
+            </select>
+            <div class="field-error" id="e-caffeine"></div>
+          </div>
+          <div class="field-group">
+            <label class="field-label"><span class="req">*</span> GLASSES/LENSES</label>
+            <select class="field-input" id="f-glasses">
+              <option value="No" selected>No</option>
+              <option value="Yes">Yes</option>
+            </select>
+            <div class="field-error" id="e-glasses"></div>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field-group">
+            <label class="field-label">PRIOR EEG SESSIONS</label>
+            <select class="field-input" id="f-prior">
+              <option value="0">None</option>
+              <option value="1-5">1 – 5 sessions</option>
+              <option value="6-20">6 – 20 sessions</option>
+              <option value="20+">20+ sessions</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">DOMINANT FREQUENCY BAND</label>
+            <select class="field-input" id="f-freq">
+              <option value="Unknown">Unknown</option>
+              <option value="Delta">Delta (0.5–4 Hz)</option>
+              <option value="Theta">Theta (4–8 Hz)</option>
+              <option value="Alpha">Alpha (8–13 Hz)</option>
+              <option value="Beta">Beta (13–30 Hz)</option>
+              <option value="Gamma">Gamma (30–100 Hz)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-section" style="margin-top:18px;"><i class="fas fa-palette"></i> DISPLAY PREFERENCES</div>
+        <div class="field-group" style="margin-bottom:12px;">
+          <label class="field-label">SUBJECT AVATAR</label>
+          <div class="avatar-row" id="avatarRow">
+            <div class="avatar-opt selected" data-av="🧠">🧠</div>
+            <div class="avatar-opt" data-av="👁️">👁️</div>
+            <div class="avatar-opt" data-av="⚡">⚡</div>
+            <div class="avatar-opt" data-av="🔬">🔬</div>
+            <div class="avatar-opt" data-av="🎯">🎯</div>
+            <div class="avatar-opt" data-av="💡">💡</div>
+            <div class="avatar-opt" data-av="🌊">🌊</div>
+            <div class="avatar-opt" data-av="🔮">🔮</div>
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">PROFILE COLOR THEME</label>
+          <div class="color-row" id="colorRow">
+            <div class="color-opt selected" data-col="#00e5ff" style="background:#00e5ff;"></div>
+            <div class="color-opt" data-col="#ff00aa" style="background:#ff00aa;"></div>
+            <div class="color-opt" data-col="#00ff88" style="background:#00ff88;"></div>
+            <div class="color-opt" data-col="#ffb300" style="background:#ffb300;"></div>
+            <div class="color-opt" data-col="#aa44ff" style="background:#aa44ff;"></div>
+            <div class="color-opt" data-col="#ff6600" style="background:#ff6600;"></div>
+          </div>
+        </div>
+        <div class="field-row full" style="margin-top:12px;">
+          <div class="field-group">
+            <label class="field-label">SESSION NOTES</label>
+            <textarea class="field-input" id="f-notes" rows="2" placeholder="Any additional notes for this session..." style="resize:vertical;min-height:56px;"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3: CONSENT -->
+      <div class="reg-step-panel" id="regPanel2">
+        <div class="form-section"><i class="fas fa-shield-alt"></i> DATA & CONSENT</div>
+        <div class="consent-row" id="ct0" onclick="toggleConsent(0)">
+          <div class="consent-toggle on" id="ctg0"></div>
+          <div class="consent-text"><b>EEG DATA COLLECTION</b> — I consent to real-time collection and analysis of my electroencephalographic data during this session.</div>
+        </div>
+        <div class="consent-row" id="ct1" onclick="toggleConsent(1)">
+          <div class="consent-toggle on" id="ctg1"></div>
+          <div class="consent-text"><b>VIDEO / OCULOMETRIC RECORDING</b> — I consent to eye-tracking and facial analysis data being used for cognitive load measurement.</div>
+        </div>
+        <div class="consent-row" id="ct2" onclick="toggleConsent(2)">
+          <div class="consent-toggle" id="ctg2"></div>
+          <div class="consent-text"><b>ANONYMIZED RESEARCH USE</b> — I agree to anonymized use of my session data for neural interface research purposes.</div>
+        </div>
+        <div class="consent-row" id="ct3" onclick="toggleConsent(3)">
+          <div class="consent-toggle" id="ctg3"></div>
+          <div class="consent-text"><b>EXPORT &amp; SHARING</b> — I allow session exports to be shared with authorized research team members.</div>
+        </div>
+        <div style="margin-top:14px;padding:12px 16px;background:rgba(0,229,255,0.04);border:1px solid rgba(0,229,255,0.1);border-radius:9px;">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:0.62rem;color:#334;line-height:1.7;">
+            <i class="fas fa-info-circle" style="color:var(--cyan);opacity:0.5;margin-right:6px;"></i>
+            By completing registration, you confirm that all provided information is accurate. Consent items marked
+            <span style="color:var(--cyan);">*required</span> (EEG + Video) are mandatory to participate in active sessions.
+            Your data is processed locally and never transmitted externally.
+          </div>
+        </div>
+        <div style="margin-top:14px;">
+          <div class="field-row full">
+            <div class="field-group">
+              <label class="field-label"><span class="req">*</span> DIGITAL SIGNATURE (type full name)</label>
+              <input class="field-input" id="f-sig" type="text" placeholder="Type your full name to sign">
+              <div class="field-error" id="e-sig"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /reg-body -->
+
+    <!-- FOOTER -->
+    <div class="reg-footer">
+      <button class="reg-btn reg-btn-back" id="regBackBtn" style="display:none;">
+        <i class="fas fa-arrow-left"></i> BACK
+      </button>
+      <span style="font-family:'Share Tech Mono',monospace;font-size:0.62rem;color:#334;margin-right:auto;margin-left:8px;" id="regStepCounter">STEP 1 OF 3</span>
+      <button class="reg-btn reg-btn-next" id="regNextBtn">
+        NEXT <i class="fas fa-arrow-right"></i>
+      </button>
+      <button class="reg-btn reg-btn-submit" id="regSubmitBtn" style="display:none;">
+        <i class="fas fa-check-circle"></i> REGISTER SUBJECT
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     PARTICLE BURST CANVAS
+     ════════════════════════════════════════════ -->
+<canvas id="burstCanvas"></canvas>
+
+<!-- ════════════════════════════════════════════
+     RESULT / EXPLODE OVERLAY
+     ════════════════════════════════════════════ -->
+<div id="resultOverlay">
+  <div class="result-bg"></div>
+  <div class="result-card">
+    <div class="result-scan"></div>
+
+    <!-- Hero section -->
+    <div class="result-hero">
+      <div class="result-glow-orb"></div>
+      <div class="result-subject-row">
+        <div class="result-avatar" id="rAvatar">🧠</div>
+        <div>
+          <div class="result-name" id="rName">SUBJECT NAME</div>
+          <div class="result-role" id="rRole">RESEARCH SUBJECT — SESSION ACTIVE</div>
+        </div>
+        <div class="result-id-badge" id="rIdBadge">NM-000000</div>
+      </div>
+      <div class="result-shimmer-line"></div>
+      <div class="result-status-bar">
+        <div class="result-pill rp-green"><div class="dot g" style="width:5px;height:5px;"></div>SUBJECT REGISTERED</div>
+        <div class="result-pill rp-cyan" id="rTimePill">SESSION: 00:00</div>
+        <div class="result-pill rp-magenta" id="rConsentPill">CONSENT ACTIVE</div>
+        <div class="result-pill rp-amber" id="rHandPill">RIGHT-HANDED</div>
+      </div>
+    </div>
+
+    <!-- Body grid -->
+    <div class="result-body">
+
+      <!-- Personal Info -->
+      <div class="result-section">
+        <div class="result-section-title"><i class="fas fa-id-card"></i> PERSONAL DATA</div>
+        <div class="result-field">
+          <div class="rf-label">FULL NAME</div>
+          <div class="rf-value highlight" id="rf-fullname">—</div>
+        </div>
+        <div class="result-field">
+          <div class="rf-label">DATE OF BIRTH</div>
+          <div class="rf-value" id="rf-dob">—</div>
+        </div>
+        <div class="result-field">
+          <div class="rf-label">AGE</div>
+          <div class="rf-value green" id="rf-age">—</div>
+        </div>
+        <div class="result-field">
+          <div class="rf-label">GENDER</div>
+          <div class="rf-value" id="rf-gender">—</div>
+        </div>
+        <div class="result-field">
+          <div class="rf-label">EMAIL</div>
+          <div class="rf-value" id="rf-email">—</div>
+        </div>
+        <div class="result-field">
+          <div class="rf-label">PHONE</div>
+          <div class="rf-value" id="rf-phone">—</div>
+        </div>
+        <div class="result-field">
+          <div class="rf-label">ORGANIZATION</div>
+          <div class="rf-value" id="rf-org">—</div>
+        </div>
+      </div>
+
+      <!-- Neural Profile -->
+      <div class="result-section">
+        <div class="result-section-title"><i class="fas fa-brain"></i> NEURAL PROFILE</div>
+        <div class="result-field">
+          <div class="rf-label">SUBJECT ID</div>
+          <div class="rf-value highlight" id="rf-sid">—</div>
+        </div>
+        <div class="result-field">
+          <div class="rf-label">STUDY ROLE</div>
+          <div class="rf-value magenta" id="rf-role">—</div>
+        </div>
+        <div class="result-field">
+          <div class="rf-label">HANDEDNESS</div>
+          <div class="rf-value" id="rf-hand">—</div>
+        </div>
+        <div class="result-field">
+          <div class="rf-label">PRIOR EEG SESSIONS</div>
+          <div class="rf-value" id="rf-prior">—</div>
+        </div>
+        <div class="result-field">
+          <div class="rf-label">DOMINANT FREQUENCY</div>
+          <div class="rf-value amber" id="rf-freq">—</div>
+        </div>
+        <div class="result-field">
+          <div class="rf-label">CONDITIONS</div>
+          <div class="rf-value" id="rf-conditions">—</div>
+        </div>
+        <div class="result-field">
+          <div class="rf-label">REGISTRATION TIME</div>
+          <div class="rf-value" id="rf-regtime">—</div>
+        </div>
+      </div>
+
+      <!-- Live EEG Snapshot -->
+      <div class="result-eeg-section">
+        <div class="result-section-title"><i class="fas fa-wave-square"></i> LIVE EEG SNAPSHOT AT REGISTRATION</div>
+        <div class="result-wave-row" id="rWaveRow">
+          <div class="rw-band">
+            <div class="rw-name" style="color:#5566ff;">DELTA</div>
+            <div class="rw-val" style="color:#5566ff;" id="rw-delta">—</div>
+            <div class="rw-bar"><div class="rw-fill" id="rwf-delta" style="background:#5566ff;width:0%;"></div></div>
+          </div>
+          <div class="rw-band">
+            <div class="rw-name" style="color:#00aaff;">THETA</div>
+            <div class="rw-val" style="color:#00aaff;" id="rw-theta">—</div>
+            <div class="rw-bar"><div class="rw-fill" id="rwf-theta" style="background:#00aaff;width:0%;"></div></div>
+          </div>
+          <div class="rw-band">
+            <div class="rw-name" style="color:var(--green);">ALPHA</div>
+            <div class="rw-val" style="color:var(--green);" id="rw-alpha">—</div>
+            <div class="rw-bar"><div class="rw-fill" id="rwf-alpha" style="background:var(--green);width:0%;"></div></div>
+          </div>
+          <div class="rw-band">
+            <div class="rw-name" style="color:var(--amber);">BETA</div>
+            <div class="rw-val" style="color:var(--amber);" id="rw-beta">—</div>
+            <div class="rw-bar"><div class="rw-fill" id="rwf-beta" style="background:var(--amber);width:0%;"></div></div>
+          </div>
+          <div class="rw-band">
+            <div class="rw-name" style="color:var(--magenta);">GAMMA</div>
+            <div class="rw-val" style="color:var(--magenta);" id="rw-gamma">—</div>
+            <div class="rw-bar"><div class="rw-fill" id="rwf-gamma" style="background:var(--magenta);width:0%;"></div></div>
+          </div>
+        </div>
+        <div style="margin-top:12px;" id="rf-notes-wrap">
+          <div class="rf-label">SESSION NOTES</div>
+          <div class="rf-value" id="rf-notes" style="margin-top:4px;color:#445;font-size:0.72rem;line-height:1.55;">—</div>
+        </div>
+      </div>
+
+    </div><!-- /result-body -->
+
+    <!-- Result Actions -->
+    <div class="result-actions">
+      <button class="btn bc" id="rExportBtn"><i class="fas fa-download"></i> EXPORT SUBJECT DATA</button>
+      <button class="btn bm" id="rEditBtn"><i class="fas fa-edit"></i> EDIT PROFILE</button>
+      <button class="btn bg" id="rCloseBtn"><i class="fas fa-check"></i> BEGIN SESSION</button>
+    </div>
+
+  </div>
+</div>
+
+
+<div id="toasts"></div>
+
+<!-- ══════════════════════════════════════════
+     NEUROMIA JAVASCRIPT MODULES
+     Load order matters — app.js first (globals),
+     then engines, then integrations last.
+     ══════════════════════════════════════════ -->
+<script src="assets/js/app.js"></script>
+<script src="assets/js/brain-renderer.js"></script>
+<script src="assets/js/eeg-engine.js"></script>
+<script src="assets/js/oculometric-engine.js"></script>
+<script src="assets/js/hardware-interface.js"></script>
+<script src="assets/js/registration.js"></script>
+<script src="assets/js/report-engine.js"></script>
+<script src="assets/js/session-history.js"></script>
+<script src="assets/js/nasa-tlx.js"></script>
+<script src="assets/js/fmg-engine.js"></script>
+<script src="assets/js/lstm-predictor.js"></script>
+<script src="assets/js/backend-connector.js"></script>
+
+
+</html>
